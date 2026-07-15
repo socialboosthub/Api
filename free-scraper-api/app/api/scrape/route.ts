@@ -66,11 +66,19 @@ export async function GET(request: Request) {
       fetchOptions.agent = agent;
     }
 
-    const response = await fetch(targetUrl, fetchOptions);
+    console.log("Fetching URL:", targetUrl);
 
-    if (!response.ok) {
-      throw new Error(`Target responded with status: ${response.status}`);
-    }
+const response = await fetch(targetUrl, fetchOptions);
+
+console.log("Status:", response.status);
+console.log("Content-Type:", response.headers.get("content-type"));
+
+if (!response.ok) {
+  const body = await response.text();
+  console.log("Response body:", body);
+
+  throw new Error(`Target responded with status ${response.status}`);
+}
 
     // Return the response directly to your script (e.g., TikWM JSON data or TikTok HTML)
     const contentType = response.headers.get('content-type') || '';
@@ -87,6 +95,13 @@ export async function GET(request: Request) {
     }
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Scraping request failed.' }, { status: 500 });
+  console.error("ERROR:", error);
+
+  return NextResponse.json(
+    {
+      error: error.message,
+      stack: error.stack
+    },
+    { status: 500 }
+  );
   }
-}
