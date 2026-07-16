@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { ProxyAgent } from "undici";
 
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Safari/537.36",
@@ -15,56 +14,97 @@ export async function GET(req: Request) {
 
   if (apiKey !== process.env.SCRAPER_API_KEY) {
     return NextResponse.json(
-      { error: "Invalid API key" },
+      { error: "Invalid API Key" },
       { status: 401 }
     );
   }
 
   if (!targetUrl) {
     return NextResponse.json(
-      { error: "Missing url" },
+      { error: "Missing url parameter" },
       { status: 400 }
     );
   }
 
+  const ua =
+    USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
   try {
+    console.log("========== NEW REQUEST ==========");
+    console.log("Target:", targetUrl);
 
-    const proxies = process.env.PROXY_LIST!.split(",");
-
-    const proxy =
-      proxies[Math.floor(Math.random() * proxies.length)].trim();
-
-    console.log("Using proxy:", proxy);
-
-    const dispatcher = new ProxyAgent(proxy);
-
-    const ua =
-      USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-
- const response = await fetch(targetUrl, {
-  dispatcher,
-  headers: {
-    "User-Agent": ua,
-    "Accept": "application/json,text/plain,*/*",
-    "Referer": "https://www.tikwm.com/",
-    "Origin": "https://www.tikwm.com"
-  }
-} as any);
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": ua,
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.tikwm.com/",
+        "Origin": "https://www.tikwm.com"
+      },
+      signal: AbortSignal.timeout(15000)
+    });
 
     console.log("Status:", response.status);
 
-    const text = await response.text();
+    const contentType =
+      response.headers.get("content-type") || "";
 
-    return NextResponse.json({
+    console.log("Content-Type:", contentType);
+
+    const body = await response.text();
+
+    console.log(
+      "First 300 chars:",
+      body.substring(0, 300)
+    );
+
+    if (
+      body.includes("Just a moment") ||
+      body.includes("cf-challenge") ||
+      body.includes("challenge-platform")
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          blocked: true,
+          status: response.status,
+          error: "Cloudflare challenge detected"
+        },
+        { status: 403 }
+      );
+    }
+
+    if (contentType.includes("application/json")) {
+      try {
+        return NextResponse.json(JSON.parse(body));
+      } catch {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid JSON returned",
+            preview: body.substring(0, 300)
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    return new Response(body, {
       status: response.status,
-      html: text
+      headers: {
+        "Content-Type": contentType || "text/plain"
+      }
     });
 
   } catch (err: any) {
-    console.error(err);
+    console.error("Fetch failed:", err);
 
-    return NextResponse.json({
-      error: err.message
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: err.message
+      },
+      { status: 500 }
+    );
   }
 }
