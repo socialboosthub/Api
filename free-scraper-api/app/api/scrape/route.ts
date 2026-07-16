@@ -41,15 +41,15 @@ export async function GET(req: Request) {
     const ua =
       USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
-    const response = await fetch(targetUrl, {
-      dispatcher,
-      headers: {
-        "User-Agent": ua,
-        "Accept": "application/json,text/plain,*/*",
-        "Referer": "https://www.tikwm.com/",
-        "Origin": "https://www.tikwm.com"
-      }
-    });
+ const response = await fetch(targetUrl, {
+  dispatcher,
+  headers: {
+    "User-Agent": ua,
+    "Accept": "application/json,text/plain,*/*",
+    "Referer": "https://www.tikwm.com/",
+    "Origin": "https://www.tikwm.com"
+  }
+} as any);
 
     console.log("Status:", response.status);
 
